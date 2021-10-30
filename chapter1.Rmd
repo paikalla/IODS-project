@@ -1,7 +1,7 @@
 
 # About the project
 
-Link to my GitHub repository: https://github.com/paikalla/IODS-project.
+Link to my GitHub repository: https://github.com/paikalla/IODS-project
 
 ```{r}
 date()
