@@ -5,6 +5,5 @@ Link to my GitHub repository: https://github.com/paikalla/IODS-project
 
 ```{r}
 date()
-plot(1)
 ```
 
