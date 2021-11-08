@@ -1,10 +1,77 @@
-# Insert chapter 2 title here
+# Linear regression and model validation
 
-*Describing the work I have done this week and summarizing learning.*
-
-
-```{r}
-plot(1)
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 ```
 
+## Dataset
+```{r}
+# Setting up
+library(car)
+library(GGally)
+library(ggplot2)
+learning2014 <- read.csv("./data/learning2014.csv", stringsAsFactors = TRUE)
+str(learning2014)
+```
+
+```{r}
+ggpairs(learning2014, mapping = aes(col=gender,alpha=0.3), lower = list(combo = wrap("facethist", bins = 20)), upper = list(continuous = wrap("cor", size = 2.5)))
+```
+
+We will choose attitude, stra, and surf as explanatory variables by looking at the correlations of variable points with other variables.
+
+## Fit a linear model for exam points
+
+Let's fit a linear model with attitude, stra and surf as explanatory variables. 
+```{r}
+fit1 <- lm(points ~ attitude + stra + surf, data = learning2014)
+summary(fit1)
+```
+As shown on the model summary, the intercept (11.0171) shows the estimated exam points when explanatory variables are set to zero. According to the model, a one-point increase in general attitude towards statistics increases the expected exam points by 3.4. The estimated effect is statistically highly significant (p-value < 0.001). We can state that under the null hypothesis of no effect (β = 0), it is very unlikely to get an estimate of β of size 3.3952.
+
+As other variables are not statistically significant, let's adjust our model by keeping only `attitude` as an explanatory variable:
+
+```{r}
+fit2 <- lm(points ~ attitude, data = learning2014)
+summary(fit2)
+```
+Now the estimated effect of a one-point increase in variable Attitude is to increase the exam points by 3.5. The estimated effect if highly significant (p-value < 0.001). However, the R-squared is only 0.1906, which means that the explanatory power of the model is low. The variable Attitude only explains 19.06 % of the variation in the variable exam points. The better the model fits the data, the closer the R-squared is to one.
+
+## Validity of model assumptions
+
+The following diagnostic plots help to evaluate the validity of our linear assumptions.
+A linear regression model assumes
+
+1) errors (residuals) are normally distributed 
+
+2) homoscedasticity: errors have mean zero and a constant variance
+
+3) linear relationship between response and explanatory variables
+
+4) independence of observations (experimental vs. dependent observations in time series)
+
+5) all relevant explanatory variables are used
+
+6) no or little multicollinearity (test with vif() Variance Inflation Factor: A VIF of 1 indicates no multicollinearity for this variable; A VIF of higher than 5 or 10 indicates a problem)
+
+7) Explanatory variables are uncorrelated with the error term
+
+```{r}
+par(mfrow=c(2,2))
+plot(fit2, which=c(1,2,5))
+hist(fit2$residuals) # normality 
+car::vif(fit1) # multicollinearity
+```
+
+***Residuals vs Fitted values***
+
+Makes it possible to inspect the assumptions of zero mean and constant variance. The residuals are scattered around zero and their spread does not depend on the fitted values. (With fitted values of 24 or larger, there are some large negative residuals, though.) No patterns in scatter plot, so our model seems to meet assumption 2) *errors are normally distributed with mean zero*.
+
+***Normal QQ-plot***
+
+The normal QQ plot inspects whether the assumption 1) *errors are normally distributed* is met. In case the residuals are normally distributed, they should lie on a straight line in the QQ plot. This is approximately the case, except some deviations at the both ends of the distribution.
+
+***Residuals vs Leverage***
+
+Residual vs Leverage makes it possible to explore if there are some observations that have a high influence on the model. Data points with large residuals (outliers) and/or high leverage may violate the outcome and accuracy of a regression. Seems like no observations have an excessively large influence on the model fit.
 

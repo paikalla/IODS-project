@@ -1,9 +1,6 @@
 
 # About the project
 
-Link to my GitHub repository: https://github.com/paikalla/IODS-project
+Welcome to my Open Data Science Project -page. Every chapter includes analysis of open data with  different multivariate statistical methods. Check also link to my GitHub repository: https://github.com/paikalla/IODS-project
 
-```{r}
-date()
-```
 
