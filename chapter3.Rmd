@@ -1,0 +1,173 @@
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(ggplot2)
+```
+
+# Logistic regression
+
+## Dataset
+
+```{r}
+alc_data <- read.csv("./data/student/pormath.csv", stringsAsFactors = TRUE)
+dim(alc_data)
+colnames(alc_data)
+```
+
+## What explains high alcohol consumption
+Graphs.
+```{r message = FALSE, warning = FALSE}
+# keep only variables of interest
+alc <- alc_data %>% select(high_use,sex,famrel,absences,G3, goout, alc_use)
+summary(select(alc_data,.data$G3,.data$absences,.data$famrel,.data$sex,.data$high_use,.data$goout))
+gather(alc) %>% ggplot(aes(value)) + facet_wrap("key", scales = "free") + geom_bar()
+
+
+# or
+p_g3 <- ggplot(data=alc_data,aes(x=high_use,y=G3,fill=high_use))
+p_g3 + geom_boxplot() + ylab("Final grade")
+p_going_out <- ggplot(data=alc_data,aes(x=goout,fill=high_use))
+p_going_out + geom_bar() + ylab("Going out")
+p_studytime <- ggplot(data=alc_data,aes(x=studytime,fill=high_use))
+p_studytime + geom_bar()
+p_internet <- ggplot(data=alc_data,aes(x=internet,fill=high_use))
+p_internet + geom_bar()
+```
+
+Crosstables
+```{r}
+table1 <- table(alc_data$sex, alc_data$high_use,dnn=c("sex","high_alc"))
+addmargins(round(prop.table(table1)*100,1)) 
+
+table2 <- table(alc_data$famrel, alc_data$high_use,dnn=c("famrel","high_alc"))
+addmargins(round(prop.table(table2)*100,1)) 
+
+table(alc_data$goout, alc_data$high_use)
+```
+Boxplots
+
+The Box plots show the associations between the continuous variables grade and absences with alcohol consumption, drawn separately for females and males. 
+```{r}
+# initialize a plot of high_use and G3, grouping by sex
+g1 <- ggplot(alc, aes(x = high_use, y = G3,col=sex))
+
+# define the plot as a boxplot and draw it
+g1 + geom_boxplot() + ylab("grade") +
+ggtitle("Student grades by alcohol consumption and sex")
+```
+
+## Logistic regression model - what causes high alcohol consumption
+
+```{r}
+logistic <- glm(high_use ~  famrel + absences + G3 + goout + sex, data = alc, family = "binomial")
+
+# print out a summary of the model
+summary(logistic)
+
+better_logistic <- glm(high_use ~  famrel + absences  + goout + sex, data = alc, family = "binomial")
+
+```
+Odd ratios
+```{r}
+# compute odds ratios (OR)
+OR <- exp(coef(logistic))
+
+# compute confidence intervals (CI)
+CI <- logistic %>% confint %>% exp
+
+# print out the odds ratios with their confidence intervals
+cbind(OR, CI)
+
+OR2 <- exp(coef(better_logistic))
+
+# compute confidence intervals (CI)
+CI2 <- better_logistic %>% confint %>% exp
+
+# print out the odds ratios with their confidence intervals
+cbind(OR2, CI2)
+
+```
+```{r}
+#predict() the probability of high_use
+probabilities <- predict(logistic, type = "response")
+
+# add the predicted probabilities to 'alc'
+alc <- mutate(alc, probability = probabilities)
+
+# use the probabilities to make a prediction of high_use
+alc <- mutate(alc, prediction = probability > 0.5)
+
+# tabulate the target variable versus the predictions
+table(high_use = alc$high_use, prediction = alc$prediction) %>% prop.table %>% addmargins()
+```
+I conduct a simple model validation by tabulating the actual outcomes versus model predictions. The proportion of incorrectly predicted students is around 20 percent (15.7 + 4.3). Thus, I would next search for additional explanatory variables!
+
+Loss function:
+```{r}
+# define a loss function (mean prediction error)
+loss_func <- function(class, prob) {
+  n_wrong <- abs(class - prob) > 0.5
+  mean(n_wrong)
+}
+
+# call loss_func to compute the average number of wrong predictions in the (training) data
+loss_func(class = alc$high_use, prob = alc$probability)
+
+```
+Cross validation:
+```{r}
+loss_func <- function(class, prob) {
+  n_wrong <- abs(class - prob) > 0.5
+  mean(n_wrong)
+}
+
+# compute the average number of wrong predictions in the (training) data
+loss_func(class = alc$high_use, prob = alc$probability)
+
+# K-fold cross-validation
+library(boot)
+cv <- cv.glm(data = alc, cost = loss_func, glmfit = logistic, K = 10)
+
+# average number of wrong predictions in the cross validation
+cv$delta[1]
+```
+
+```{r}
+alc2 <- alc_data %>% select(G3, goout,studytime,internet, high_use, absences, health, internet, nursery, romantic, sex)
+
+logistic2 <- glm(high_use ~  internet + nursery + goout + sex, data = alc2, family = "binomial")
+summary(logistic2)
+
+#predict() the probability of high_use
+probabilities2 <- predict(logistic2, type = "response")
+
+# add the predicted probabilities to 'alc'
+alc2 <- mutate(alc2, probability = probabilities2)
+
+# use the probabilities to make a prediction of high_use
+alc2 <- mutate(alc2, prediction = probability > 0.5)
+
+loss_func(class = alc2$high_use, prob = alc2$probability)
+
+cv2 <- cv.glm(data = alc2, cost = loss_func, glmfit = logistic2, K = 5)
+
+# average number of wrong predictions in the cross validation
+cv2$delta[1]
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

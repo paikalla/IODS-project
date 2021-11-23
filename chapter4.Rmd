@@ -1,0 +1,254 @@
+# Clustering and classification
+
+```{r message=FALSE,warning=FALSE,chace=TRUE}
+library(MASS)
+library(GGally)  
+library(ggplot2)
+library(tidyverse)
+library(corrplot)
+```
+
+## Dataset
+
+```{r}
+head(Boston, n = 4)
+dim(Boston)
+summary(Boston)
+```
+Variables scale quite differently.
+
+```{r message = FALSE, warning = FALSE, fig.height = 5, fig.width = 10}
+
+# plot distributions and correlations of continuous variables 
+p <- Boston %>% 
+  ggpairs(
+    mapping = aes(alpha=0.5), 
+    lower = list(continuous = wrap("points", colour = "cornflower blue", size=0.3)), 
+    upper = list(continuous = wrap("cor", size = 2)),
+    diag = list(continuous = wrap("densityDiag", colour = "cornflower blue"))) +
+ theme(axis.text.x = element_text(size=5), 
+       axis.text.y = element_text(size=5))  
+p
+```
+
+There are only few variables that are somewhat normally distributed (rm - which is the average number of rooms per dwelling). Most of the variables are skewed and/or bimodal. Also checking the correlations.
+
+```{r message = FALSE, warning = FALSE}
+
+cor_matrix <- round(cor(Boston),2)
+corrplot(round(cor(Boston),2),tl.cex=0.7)
+
+```
+
+There are some negative correlation especially between dis (distance from Boston employment centres) - one of them is a negative correlation with age. Tax has a strong positive correlation with various variables - e.g. rad (accessibility to radial highways). But at least now it is difficult to say much about this data since there does not seem to be any clear patterns. 
+
+### Scale data
+
+Since the scales of the variables were so all over the place (and that is bad for clustering), we need to scale the data: 
+
+```{r}
+boston_sc <- scale(Boston)
+boston_sc <- as.data.frame(boston_sc) # scale -function outputs a matrix and we have to transform it into a data frame
+summary(boston_sc)
+
+sd(boston_sc$dis)
+```
+
+Scaling changed the data in a way which made the mean of all variables 0. It made also the variables to resemble each other more - for example tax's scale was from 187.0 to 771.0 and after scaling it is from -1.3127 to 1.1764. This step makes sense if we are interested about the distances between the cases that are described in this dataset. 
+
+Then we will create a categorical variable called crime which is based on the quantiles of crim variable:
+
+```{r chace=TRUE}
+brks <- quantile(boston_sc$crim)
+lbls <- c("low","med_low","med_high","high")
+crime <- cut(boston_sc$crim, breaks = brks, label = lbls, include.lowest = TRUE)
+boston_sc$crime <- crime
+boston_sc <- dplyr::select(boston_sc, -crim) # Remove the old crim variable
+summary(boston_sc$crime)
+
+```
+
+Then let's divide the data into training (80%) and testing sets (20%):
+
+```{r chace=TRUE}
+n <- nrow(boston_sc)
+ind <- sample(n, size=n*0.8)
+train_set <- boston_sc[ind,]
+test_set <- boston_sc[-ind,]
+```
+
+Now we have two sets. First, *train_set* has randomly chosen 80% cases of the Boston data. Second, *test_set* has randomly chosen 20% of cases. 
+
+## Linear Discriminant Model
+
+Next I estimate a linear discriminant model with crime as the target variable. The purpose of the analysis is to identify those variables that explain whether a tract has a high or low crime rate. We have here a four-class grouping of crime rate.
+
+A linear discriminant model assumes that explanatory variables are continuous and normally distributed given the classes defined by the target variable. Moreover, a constant variance across the explanatory variables is assumed. According to the preliminary analysis, the assumption of normality is not satisfied. I do not check whether the assumption is satisfied given the crime class but simply assume normality. The constant variance assumption is satisfied because of scaling.
+
+The results from linear discriminant analysis are shown below. The prior probabilities show the proportions of observations belonging to the four groups in the train data. They are not exactly equal because the grouping was done with all the 506 tracts. The variable means differ across crime groups suggesting that they have an association with the crime rate.
+
+The first linear discriminant explains 95% of the variance between the groups based on crime rate.
+
+```{r}
+lda_fit  <- lda(crime ~ ., data = train_set)
+lda_fit
+```
+The LDA biplot based on the estimated model is shown below. The observations are colored on the basis of their crime group. The arrows indicate that variable rad (index of accessibility to radial highways) is a strong predictor of linear discriminant 1, while variables nox (air pollution) and zn (prop. of residential land zoned for large lots) explain linear discriminant 2.
+
+```{r chace=TRUE} 
+# the function for lda biplot arrows
+lda_arrows <- function(x, myscale = 1, arrow_heads = 0.1, color = "red", tex = 0.75, choices = c(1,2)){
+  heads <- coef(x)
+  arrows(x0 = 0, y0 = 0, 
+         x1 = myscale * heads[,choices[1]], 
+         y1 = myscale * heads[,choices[2]], col=color, length = arrow_heads)
+  text(myscale * heads[,choices], labels = row.names(heads), 
+       cex = tex, col=color, pos=3)
+}
+
+# target classes as numeric
+classes <- as.numeric(train_set$crime)
+colnames(train_set)
+# plot the lda results
+plot(lda_fit, dimen = 2, col=classes, pch=classes)
+
+lda_arrows(lda_fit, myscale = 2)
+
+```
+
+## Model validation
+
+I use the test data to validate the model, ie. to see whether the observations in the test data are correctly classified.
+
+```{r}
+# save the correct classes from test data
+correct_classes <- test_set$crime
+
+# remove the crime variable from test data
+test <- dplyr::select(test_set, -crime)
+```
+The table below shows (after a little calculation) that roughly 1/3 of observations lie outside the diagonal i.e. are incorrectly predicted by the model. (if prop.table used). 
+
+If addmargins() used: It seems that this model was quite good at classifying the cases from the test_set (78/102 were classified right). Although, in the case of med_low, it only managed to get 15/29 right. The whole model managed to place the case in the right “basket of crime rate” in about 76% of the cases. I guess that this could be considered as relatively good success rate.
+
+```{r}
+# predict classes with test data
+lda_pred <- predict(lda_fit, newdata = test)
+
+# Confusion Matrix and Accuracy
+tab1 <- table(correct = correct_classes, predicted = lda_pred$class) %>% addmargins()  #%>% prop.table 
+
+accuracy1 <- sum(diag(tab1))/sum(tab1)
+
+accuracy1
+```
+## K-means clustering
+
+As a final step, I run a K-means clustering analysis with Boston data set. K-means clustering divides observations into pre-defined number of clusters (K), by minimizing the distance of observations to cluster means (centroids). I first look at the distances between observations, using a popular distance measure, Euclidean distance.
+
+```{r}
+library(MASS)
+data('Boston')
+
+# remove variable chas 
+#Boston <- Boston %>% dplyr::select(-chas)
+
+# center and standardize variables
+boston_scaled <- scale(Boston)
+
+# change the object to data frame
+boston_scaled <- as.data.frame(boston_scaled)
+
+# euclidean distance matrix
+dist_eu <- dist(boston_scaled)
+
+# look at the summary of the distances
+summary(dist_eu)
+```
+I first choose three clusters (K=3). The plot below suggests that variables black, and tax have a strong association with clusters. Many of the other variables seem to have a somewhat weaker effect, too.
+
+```{r}
+# k-means clustering
+km <- kmeans(Boston, centers = 2)
+
+summary(km)
+
+# plot the Boston dataset with clusters
+pairs(boston_scaled[1:10], col = km$cluster)
+pairs(boston_scaled[4:6], col = km$cluster)
+pairs(boston_scaled[7:9], col = km$cluster)
+pairs(boston_scaled[10:12], col = km$cluster)
+pairs(boston_scaled[13:14], col = km$cluster)
+```
+I search for optimal number of clusters K by inspecting how the total of within cluster sum of squares (total WCSS) changes when K changes. I let K run from 1 to 10. The optimal number of clusters is the value of K where the total WCSS drops rapidly.
+
+The plot below shows that the optimal number of clusters is 2.
+
+```{r}
+set.seed(123)
+
+# determine the number of clusters
+k_max <- 10
+
+# calculate the total within sum of squares
+twcss <- sapply(1:k_max, function(k){kmeans(boston_scaled, k)$tot.withinss})
+
+# visualize the results
+qplot(x = 1:k_max, y = twcss, geom = 'line')
+```
+I choose K=2 and re-run the K-means clustering algoritm. The plot below gives support to dividing this data set to two clusters. Twcss = total within cluster sum of square
+
+```{r}
+# k-means clustering
+km <-kmeans(boston_scaled, centers = 2)
+
+# plot the Boston dataset with 2 clusters
+pairs(boston_scaled[1:6], col = km$cluster)
+pairs(boston_scaled[7:14], col = km$cluster)
+```
+
+## Bonus
+
+```{r}
+data(Boston)
+set.seed(22)
+boston_again <- scale(Boston)
+boston_again <- as.data.frame(boston_again)
+boston_km <- kmeans(boston_again,centers=4)
+boston_again$cluster <- boston_km$cluster
+boston_lda <- lda(cluster~., data=boston_again)
+plot(boston_lda, dimen=2, col=boston_again$cluster)
+lda_arrows(boston_lda, myscale=2)
+```
+It seems that he most influencial individual variable is black. Other variables that have a relatively strong influence are crim, indus, nox and tax. Variables black and crime seem to “pull” in their “own ways” and most of the variables are in a group that “pulls” to left. The fact that black seems to be influential confirms earlier observations (e.g. 7th part of this exercise).
+
+## Super-bonus
+```{r message = FALSE, warning = FALSE}
+model_predictors <- dplyr::select(train_set, -crime)
+# check the dimensions
+summary(model_predictors)
+summary(lda_fit$scaling)
+
+# matrix multiplication
+matrix_product <- as.matrix(model_predictors) %*% lda_fit$scaling
+matrix_product <- as.data.frame(matrix_product)
+
+summary(matrix_product)
+
+# install.packages("plotly")
+library(plotly)
+
+plot_ly(x=matrix_product$LD1,  y=matrix_product$LD2, z=matrix_product$LD3, type="scatter3d", mode="markers", color=classes, size=I(40))
+
+train_km <- kmeans(train_set[,-14],centers=4)
+cluster_col <- train_km$cluster
+
+plot_ly(x=matrix_product$LD1,  y=matrix_product$LD2, z=matrix_product$LD3, type="scatter3d", mode="markers", color=cluster_col, size=I(40))
+```
+The way the points are scattered in these plots resemble each other relatively well. Based on these two plots, I would say that crime-variable seems to have relatively large role when the algorithm defines the cluster. These two plots illustrate it, since the point colors of clusters seem to be scattered quite similarly to the crime rate.
+
+
+
+
+
+

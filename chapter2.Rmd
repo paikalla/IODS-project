@@ -1,16 +1,14 @@
 # Linear regression and model validation
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
-```
-
 ## Dataset
-```{r}
+```{r message = FALSE, warning = FALSE}
 # Setting up
 library(car)
 library(GGally)
 library(ggplot2)
-learning2014 <- read.csv("./data/learning2014.csv", stringsAsFactors = TRUE)
+
+# Data
+learning2014 <- read.csv("./data/learning/learning2014.csv", stringsAsFactors = TRUE)
 str(learning2014)
 ```
 
@@ -24,8 +22,8 @@ We will choose attitude, stra, and surf as explanatory variables by looking at t
 
 Let's fit a linear model with attitude, stra and surf as explanatory variables. 
 ```{r}
-fit1 <- lm(points ~ attitude + stra + surf, data = learning2014)
-summary(fit1)
+my_model <- lm(points ~ attitude + stra + surf, data = learning2014)
+summary(my_model)
 ```
 As shown on the model summary, the intercept (11.0171) shows the estimated exam points when explanatory variables are set to zero. According to the model, a one-point increase in general attitude towards statistics increases the expected exam points by 3.4. The estimated effect is statistically highly significant (p-value < 0.001). We can state that under the null hypothesis of no effect (β = 0), it is very unlikely to get an estimate of β of size 3.3952.
 
@@ -60,12 +58,11 @@ A linear regression model assumes
 par(mfrow=c(2,2))
 plot(fit2, which=c(1,2,5))
 hist(fit2$residuals) # normality 
-car::vif(fit1) # multicollinearity
 ```
 
 ***Residuals vs Fitted values***
 
-Makes it possible to inspect the assumptions of zero mean and constant variance. The residuals are scattered around zero and their spread does not depend on the fitted values. (With fitted values of 24 or larger, there are some large negative residuals, though.) No patterns in scatter plot, so our model seems to meet assumption 2) *errors are normally distributed with mean zero*.
+Makes it possible to inspect the assumptions of zero mean and constant variance. The residuals are scattered around zero and their spread does not depend on the fitted values. (With fitted values of 24 or larger, there are some large negative residuals, though.) No patterns in scatter plot, so our model seems to meet assumption 2) *homoscedasticity*.
 
 ***Normal QQ-plot***
 
