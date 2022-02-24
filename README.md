@@ -1,3 +1,11 @@
 # Open Data Science Project
-Generalized Linear Models, Clustering and Classification (DA, KMC), Dimensionality reduction techniques (PCA, MCA)
 
+GLMs
+  Regression and model validation
+  Logistic regression
+Clustering and classification
+  Discriminant analysis (DA)
+  K-means clustering (KMC)
+Dimensionality reduction techniques
+  Principal component analysis (PCA)
+  Multiple Correspondence analysis (MCA)
